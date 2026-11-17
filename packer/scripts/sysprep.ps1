@@ -92,12 +92,14 @@ try {
   # 5. sysprep. /generalize: remove what is unique to this installation. /oobe: the next boot runs setup's
   #    last part again. /quit: do not shut down, come back here, so that a failure is seen and reported
   #    (Packer shuts the VM down afterwards). /unattend: the answers for that next boot, which hand over
-  #    to cloudbase-init.
+  #    to cloudbase-init. The answer file by its bare name, from its own folder (as cloudbase-init's docs run
+  #    it): its full path has spaces, and sysprep stopped with "Unable to parse command-line arguments" on
+  #    /unattend:"C:\Program Files\...\Unattend.xml" as Start-Process passed it. Sysprep keeps its own copy
+  #    (Windows\Panther), so the folder does not matter after this.
   Remove-Item -Path "$sysprep_dir\Sysprep_succeeded.tag" -Force -ErrorAction SilentlyContinue
   Write-Output "sysprep: running sysprep /generalize /oobe /quit (a few minutes)"
-  $run = Start-Process -FilePath "$sysprep_dir\sysprep.exe" -Wait -PassThru -ArgumentList @(
-    "/generalize", "/oobe", "/quit", "/quiet", "/unattend:`"$unattend`""
-  )
+  $run = Start-Process -FilePath "$sysprep_dir\sysprep.exe" -Wait -PassThru -WorkingDirectory (Split-Path $unattend) `
+    -ArgumentList "/generalize /oobe /quit /quiet /unattend:$(Split-Path $unattend -Leaf)"
 
   if (-not ((Test-Path "$sysprep_dir\Sysprep_succeeded.tag") -and (Test-Generalized))) {
     Write-Output "sysprep: sysprep.exe ended with exit code $($run.ExitCode) and did not generalize. The end of its error log:"
