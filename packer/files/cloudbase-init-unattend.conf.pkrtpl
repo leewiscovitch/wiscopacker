@@ -1,0 +1,30 @@
+# cloudbase-init, the first run: once, while a clone finishes Windows setup (the "specialize" pass of the
+# Unattend.xml that sysprep was given), before anyone can log in. It sets the host name there, so Windows
+# restarts into its first real boot already carrying it. Rendered by Packer; docs/build.md "cloudbase-init".
+[DEFAULT]
+username = ${username}
+groups = Administrators
+inject_user_password = true
+first_logon_behaviour = no
+
+metadata_services = cloudbaseinit.metadata.services.configdrive.ConfigDriveService
+# SetHostNamePlugin reads the name from the metadata, UserDataPlugin from the user data (where Proxmox
+# puts it). No user, password or keys here: the normal run does those.
+plugins = cloudbaseinit.plugins.common.sethostname.SetHostNamePlugin,cloudbaseinit.plugins.common.userdata.UserDataPlugin,cloudbaseinit.plugins.windows.extendvolumes.ExtendVolumesPlugin
+# Windows setup restarts by itself after this run (the command in Unattend.xml asks for it)
+allow_reboot = false
+stop_service_on_exit = false
+
+verbose = true
+debug = false
+log_dir = C:\Program Files\Cloudbase Solutions\Cloudbase-Init\log\
+log_file = cloudbase-init-unattend.log
+default_log_levels = comtypes=INFO,suds=INFO,iso8601=WARN,requests=WARN
+
+bsdtar_path = C:\Program Files\Cloudbase Solutions\Cloudbase-Init\bin\bsdtar.exe
+mtools_path = C:\Program Files\Cloudbase Solutions\Cloudbase-Init\bin\
+check_latest_version = false
+
+[config_drive]
+types = iso
+locations = cdrom

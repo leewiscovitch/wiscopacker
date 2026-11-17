@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# The checks to run before every commit. None of them needs a Proxmox host: the real test is a build.
+#   tests/run
+# Needs: packer, xmllint (Debian/Ubuntu: libxml2-utils). PSScriptAnalyzer runs if pwsh is installed.
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+failed=0
+
+step() { printf "\n== %s\n" "$1"; }
+bad() { printf "FAILED: %s\n" "$1"; failed=1; }
+
+for tool in packer xmllint; do
+  command -v "${tool}" > /dev/null || { echo "tests/run: ${tool} is not installed"; exit 2; }
+done
+
+step "packer fmt"
+packer fmt -check -recursive packer/ || bad "packer fmt (fix with: packer fmt -recursive packer/)"
+
+step "packer init"
+packer init packer/ || bad "packer init"
+
+step "packer validate (example values, dummy secrets)"
+# Secrets come from the environment only; these two are placeholders and reach nothing.
+PKR_VAR_proxmox_token_secret="00000000-0000-0000-0000-000000000000" \
+  PKR_VAR_build_password="NotARealPassword1" \
+  packer validate -var-file packer/example.pkrvars.hcl packer/ || bad "packer validate"
+
+step "answer files are well-formed XML"
+mapfile -t answer_files < <(find packer -name "autounattend.xml*" | sort)
+if [ "${#answer_files[@]}" -eq 0 ]; then
+  bad "no autounattend.xml found under packer/"
+fi
+for file in "${answer_files[@]}"; do
+  # A .pkrtpl file is checked as it stands: its ${...} placeholders sit in text and attribute values, where
+  # they are ordinary characters to XML.
+  xmllint --noout "${file}" && echo "ok ${file}" || bad "${file}"
+done
+
+step "no value of any one lab"
+# One lab's names, addresses and storage ids, and private address ranges in general (examples use 192.0.2.x).
+# 169.254.169.254 and 127.0.0.1 are not lab values.
+pattern="wiscopronode|wiscovitch|local-zfs|lab30|(^|[^0-9])10\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\."
+hits="$(git grep -nIE "${pattern}" -- . ":!tests/run" | grep -vE "^README\.md:.*github\.com/leewiscovitch/" || true)"
+if [ -n "${hits}" ]; then
+  echo "${hits}"
+  bad "lab values (above)"
+else
+  echo "none"
+fi
+
+step "PSScriptAnalyzer"
+if command -v pwsh > /dev/null; then
+  pwsh -NoProfile -Command '
+    if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) { Write-Output "skipped (module PSScriptAnalyzer not installed)"; exit 0 }
+    $found = Invoke-ScriptAnalyzer -Path packer/scripts -Recurse -Severity Warning, Error
+    $found | Format-Table -AutoSize
+    if ($found) { exit 1 }
+    Write-Output "clean"
+  ' || bad "PSScriptAnalyzer"
+else
+  echo "skipped (pwsh not installed)"
+fi
+
+echo
+if [ "${failed}" -ne 0 ]; then
+  echo "tests/run: FAILED"
+  exit 1
+fi
+echo "tests/run: all passed"

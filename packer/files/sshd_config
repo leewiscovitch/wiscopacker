@@ -1,0 +1,13 @@
+# sshd_config of the template (C:\ProgramData\ssh\sshd_config), put there by enable-communicator.ps1.
+#
+# One difference from the file Windows ships: no "Match Group administrators" block. That block makes sshd
+# read an administrator's keys from C:\ProgramData\ssh\administrators_authorized_keys only. cloudbase-init
+# writes a clone's keys into the user's own .ssh\authorized_keys, and that user is an administrator, so
+# with the block the keys would never count.
+
+PubkeyAuthentication yes
+PasswordAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+
+# File copies (Packer during the build, Ansible and scp afterwards)
+Subsystem sftp sftp-server.exe
