@@ -86,6 +86,17 @@ try {
     -Value "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" | Out-Null
   Write-Output "sysprep: sshd's shell is PowerShell from the next connection on"
 
+  # 3b. Port 22 on every profile, again, and checked. enable-communicator.ps1 set it at the first logon, but
+  #     a cumulative update that services the OpenSSH server package puts Windows' own rule back (private
+  #     profile only): seen on Server Core, 2026-11 update. The build never notices (its network is set to
+  #     private); a clone's network starts as public, and SSH would time out.
+  Set-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -Enabled True -Profile Any
+  $rule = Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP"
+  if ($rule.Enabled -ne "True" -or $rule.Profile -ne "Any") {
+    throw "the firewall rule OpenSSH-Server-In-TCP is $($rule.Enabled) on $($rule.Profile), not True on Any"
+  }
+  Write-Output "sysprep: firewall rule for sshd on every profile"
+
   # 4. The build account (the built-in Administrator, SID ending in -500) is disabled: its password was
   #    this build's, and no clone should have an account it did not ask for. Not when the clones' own user
   #    is that very account. Disabling does not end the session this script runs in.
