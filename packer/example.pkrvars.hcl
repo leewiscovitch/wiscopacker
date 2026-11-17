@@ -20,7 +20,9 @@ bridge             = "vmbr0"
 # this one; Microsoft replaces it with a newer build now and then). Check the checksum of what you download.
 windows_iso_url      = "https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.32230.260111-0550.lt_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso"
 windows_iso_checksum = "sha256:7b052573ba7894c9924e3e87ba732ccd354d18cb75a883efa9b900ea125bfd51"
-image_name           = "Windows Server 2025 Standard Evaluation (Desktop Experience)"
+# Server Core instead: "Windows Server 2025 Standard Evaluation" (no "(Desktop Experience)"), with its own vm_id
+# and template_name.
+image_name = "Windows Server 2025 Standard Evaluation (Desktop Experience)"
 
 # virtio-win, pinned. The answer file takes its drivers from the folders "2k25" of this ISO.
 virtio_iso_url      = "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.302-1/virtio-win-0.1.302.iso"

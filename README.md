@@ -1,6 +1,6 @@
 # wiscopacker
 
-Windows Server 2025 and Windows 11 templates for Proxmox VE, built with Packer, the way AWS builds its official
+Windows Server 2025 (with the desktop, or Server Core) and Windows 11 templates for Proxmox VE, built with Packer, the way AWS builds its official
 Windows AMIs. Bake an image, launch a VM from it, let it configure itself on first boot (cloud-init drive and
 cloudbase-init), then manage it over SSH. Nobody touches the console in between.
 
@@ -48,4 +48,5 @@ come. Windows 11 follows.
 
 - `docs/build.md`: the build step by step, why each step is there, what to check, what goes wrong
 - `packer/example.pkrvars.hcl`: the values to give; `packer/variables.pkr.hcl` describes each
+- Server Core: the same source with the Core edition's `image_name` (`docs/build.md` "Server Core")
 - `tests/run`: the checks before every commit

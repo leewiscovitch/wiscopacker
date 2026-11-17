@@ -32,6 +32,25 @@ for testing everything else. Not for a template you use.
 
 The id (`vm_id`) must be free. The build never replaces a VM or a template: remove the old one first.
 
+### Server Core (no desktop)
+
+The same ISO and the same source (`server-2025`) build Server Core: give the Core edition's name as
+`image_name`, and its own `vm_id` and `template_name`. In the Server 2025 evaluation ISO the four images are
+(display names, as Setup lists them): `Windows Server 2025 Standard Evaluation` (Core), the same with
+`(Desktop Experience)`, and the two Datacenter ones likewise. List them yourself with
+`wiminfo sources/install.wim` (or `dism /Get-WimInfo /WimFile:...`) on the mounted ISO.
+
+```bash
+packer build -only "*.server-2025" -var-file my.pkrvars.hcl \
+  -var vm_id=9001 -var template_name=windows-server-2025-core \
+  -var 'image_name=Windows Server 2025 Standard Evaluation' packer/
+```
+
+What differs on Core: no Explorer, so the VM's console shows a command window (or SConfig), not a desktop; the
+scripts are the same. One fault Core showed and the desktop never did: `cleanup.ps1`'s delete of the update
+download cache met a folder Windows removed at the same moment and failed the build; the delete now leaves such a
+folder alone (step 8).
+
 ## Versions
 
 Read on 2026-11-17, each at the pinned version:
@@ -185,7 +204,8 @@ would refuse, or the half-finished installation would be in every clone), then:
 - **the recovery partition behind `C:`** (step 3): WinRE moved back into `C:` (`reagentc /disable`), the
   partition removed, `C:` grown to the end of the disk, WinRE on again (`reagentc /enable`: with no recovery
   partition it stays on `C:`). Any other partition behind `C:` stops the build untouched
-- crash dumps, the update download cache, temp folders
+- crash dumps, the update download cache, temp folders (best effort: what is in use, or vanishes while it is
+  deleted, is left alone with a line `cleanup: left alone, <path> (...)`; first seen on Core)
 - **setup's copies of the answer file**, `C:\Windows\Panther\unattend-original.xml` among them: setup leaves
   the build password in it **in plain text** (the others it blanks). Then every XML file under
   `C:\Windows\Panther` and `C:\Windows\System32\Sysprep` is read, and the build stops if one still holds a
@@ -199,7 +219,9 @@ would refuse, or the half-finished installation would be in every clone), then:
    and `SetupComplete.cmd` starts it
 2. makes sure that file has `PersistAllDeviceInstalls` (it does as shipped): sysprep then keeps the VirtIO drivers
    bound instead of forgetting every device
-3. makes PowerShell sshd's shell
+3. makes PowerShell sshd's shell, and sets the firewall rule for port 22 to every profile **again**, and checks
+   it: a cumulative update that services the OpenSSH server puts Windows' own rule back (private only). The
+   build never notices (its network is private); a clone's network starts public, and SSH times out
 4. disables the build account (the built-in `Administrator`)
 5. runs `sysprep /generalize /oobe /quit /unattend:<that file>` and checks that Windows is generalized; if not,
    it prints the end of sysprep's error log and the build fails
@@ -272,6 +294,8 @@ A clone's first boot (proved 2026-11-17, the second clone; the first showed the 
 | Setup asks a question | step 3 |
 | "Waiting for SSH" for ever | step 4 |
 | `cleanup: FAILED: Windows still wants a restart` | an update needs two restarts; run the build again, or add a second restart before the cleanup |
+| A clone answers ping and has its name and address, but SSH **times out** (not refused); inside, the rule `OpenSSH-Server-In-TCP` is on `Private` only and the network is `Public` | a template built before the fix in `sysprep.ps1` (step 8): Windows Update reset the rule. Rebuild. In such a clone, through the guest agent: `Set-NetFirewallRule -Name OpenSSH-Server-In-TCP -Profile Any` |
+| `cleanup: FAILED: An object at the specified path ...\SoftwareDistribution\Download\... does not exist.` | a build before the fix in `cleanup.ps1` (step 8): a folder vanished while it was being deleted (seen on Core). Fixed |
 | `sysprep: FAILED` | step 8; the log shows sysprep's own error |
 | `sysprep: this Windows is already generalized` on a first build | an old check (`GeneralizationState` is 7 on a fresh install too); fixed: the script reads `ImageState` |
 | `SYSPRP WinMain: Unable to parse command-line arguments` | the answer file's path with spaces after `/unattend:`; fixed: sysprep runs from the file's folder with its bare name |
