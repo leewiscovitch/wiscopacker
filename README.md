@@ -7,7 +7,8 @@ cloudbase-init), then manage it over SSH. Nobody touches the console in between.
 For anyone running Proxmox VE who wants Windows guests made like cloud instances. Every value is a variable:
 nothing here is tied to one lab.
 
-**Status:** being built. Nothing usable yet.
+**Status:** Windows Server 2025 is written and passes its checks (`tests/run`); the first real build is still to
+come. Windows 11 follows.
 
 ## The AWS loop, mapped
 
@@ -45,4 +46,6 @@ nothing here is tied to one lab.
 
 ## More
 
-`docs/` (the build step by step, why each step is there, what to check) comes with the first working build.
+- `docs/build.md`: the build step by step, why each step is there, what to check, what goes wrong
+- `packer/example.pkrvars.hcl`: the values to give; `packer/variables.pkr.hcl` describes each
+- `tests/run`: the checks before every commit
