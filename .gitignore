@@ -1,0 +1,8 @@
+# Var files hold someone's own values; only the example is committed
+*.pkrvars.hcl
+!example.pkrvars.hcl
+*.auto.pkrvars.hcl
+
+packer_cache/
+*.log
+*.iso
