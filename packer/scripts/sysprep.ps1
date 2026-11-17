@@ -12,12 +12,14 @@ $ProgressPreference = "SilentlyContinue"
 $home_dir = "C:\Program Files\Cloudbase Solutions\Cloudbase-Init"
 $unattend = "$home_dir\conf\Unattend.xml"
 $sysprep_dir = "C:\Windows\System32\Sysprep"
-$state_key = "HKLM:\SYSTEM\Setup\Status\SysprepStatus"
+$state_key = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Setup\State"
 
 function Test-Generalized {
-  # 7: "image is generalized" (4 is a Windows that completed setup)
-  $state = Get-ItemProperty -Path $state_key -Name "GeneralizationState" -ErrorAction SilentlyContinue
-  ($null -ne $state) -and ($state.GeneralizationState -eq 7)
+  # Windows Setup's own state (Microsoft: "Windows Setup States"): IMAGE_STATE_COMPLETE on an installed
+  # Windows, IMAGE_STATE_GENERALIZE_RESEAL_TO_OOBE once sysprep /generalize /oobe has run. Not
+  # SYSTEM\Setup\Status\SysprepStatus\GeneralizationState: that is 7 on a fresh install as well.
+  $state = Get-ItemProperty -Path $state_key -Name "ImageState" -ErrorAction SilentlyContinue
+  ($null -ne $state) -and ($state.ImageState -eq "IMAGE_STATE_GENERALIZE_RESEAL_TO_OOBE")
 }
 
 try {
