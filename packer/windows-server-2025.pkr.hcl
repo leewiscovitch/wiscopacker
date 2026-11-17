@@ -46,7 +46,7 @@ source "proxmox-iso" "server-2025" {
   vm_id                = var.vm_id
   vm_name              = var.template_name
   template_name        = var.template_name
-  template_description = coalesce(var.template_description, "Windows Server 2025, built ${formatdate("YYYY-MM-DD", timestamp())} with Packer.")
+  template_description = coalesce(var.template_description, "${var.image_name}, built ${formatdate("YYYY-MM-DD", timestamp())} with Packer.")
 
   # "win11" is Proxmox's type for Windows 11, Server 2022 and Server 2025. It also makes the cloud-init drive
   # a configdrive2 with the password in plain text, which is what cloudbase-init reads.

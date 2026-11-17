@@ -51,7 +51,7 @@ variable "template_name" {
 variable "template_description" {
   type        = string
   default     = ""
-  description = "The template's description. Empty: the Windows version and the build date."
+  description = "The template's description. Empty: the edition (image_name) and the build date."
 }
 
 variable "disk_storage" {
