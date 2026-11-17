@@ -34,7 +34,12 @@ try {
   if (-not (Test-Path $unattend)) { throw "$unattend is missing: was install-cloudbase-init.ps1 run?" }
   $service = Get-CimInstance -ClassName Win32_Service -Filter "Name='cloudbase-init'"
   if (-not $service) { throw "the service cloudbase-init does not exist" }
-  if ($service.StartMode -ne "Auto") { throw "the service cloudbase-init does not start with Windows (start mode $($service.StartMode))" }
+  # Manual until Windows setup has finished in a clone; SetupComplete.cmd then starts it (install-cloudbase-init.ps1)
+  if ($service.StartMode -ne "Manual") { throw "the service cloudbase-init must be Manual in the template (start mode $($service.StartMode))" }
+  $setup_complete = "C:\Windows\Setup\Scripts\SetupComplete.cmd"
+  if (-not (Test-Path $setup_complete) -or -not (Select-String -Path $setup_complete -Pattern "sc.exe start cloudbase-init" -SimpleMatch -Quiet)) {
+    throw "$setup_complete does not start cloudbase-init: was install-cloudbase-init.ps1 run?"
+  }
   if ($service.State -ne "Stopped") { throw "the service cloudbase-init is running in the build VM: it must run first in a clone" }
 
   # 2. PersistAllDeviceInstalls: sysprep normally forgets every installed device, and a clone would have

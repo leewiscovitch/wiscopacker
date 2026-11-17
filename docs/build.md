@@ -164,6 +164,13 @@ After the last restart, so that its service never starts in the build VM.
 - `RUN_SERVICE_AS_LOCAL_SYSTEM=1`: otherwise the installer makes a local account `cloudbase-init` with a password
   of its own, one more account in every clone
 - Both config files come from the small CD (below)
+- **The service is `Manual` in the template, and `C:\Windows\Setup\Scripts\SetupComplete.cmd` starts it.** Windows
+  runs that file once, as SYSTEM, when setup has finished in a clone and before the logon screen: it sets the
+  service to start with Windows and starts it. Left `Automatic`, the service starts while the clone is still in
+  Windows setup and runs as soon as specialize ends, during the welcome phase: there a user's profile can't be
+  loaded yet ("Cannot load user profile: 'The device is not ready.'"), so the user is made without a profile and
+  the SSH keys never get written; the service may also restart Windows in the middle of setup. Seen in the first
+  clone; a `SetupComplete.cmd` that is already there and not this build's is never overwritten
 - A script in cloudbase-init's `LocalScripts`, run once in each clone, disables the built-in `Administrator`
   there: the build disables it before the capture, and this holds if Windows setup switches it back on. Left out
   when `clone_username` is `Administrator`
@@ -176,7 +183,8 @@ download cache, temp folders, setup's copies of the answer file, and clears the 
 
 `sysprep.ps1`:
 
-1. checks that cloudbase-init's `Unattend.xml` and its service are in place and the service has not run
+1. checks that cloudbase-init's `Unattend.xml` and its service are in place, the service is `Manual`, has not run,
+   and `SetupComplete.cmd` starts it
 2. makes sure that file has `PersistAllDeviceInstalls` (it does as shipped): sysprep then keeps the VirtIO drivers
    bound instead of forgetting every device
 3. makes PowerShell sshd's shell
@@ -203,7 +211,7 @@ A clone's first boot (**to prove** with the first clone):
 1. Windows finishes setup with cloudbase-init's `Unattend.xml`. In its specialize pass cloudbase-init runs once
    with `cloudbase-init-unattend.conf`: it sets the **host name** from the cloud-init drive and grows `C:`.
    Windows restarts
-2. The service runs with `cloudbase-init.conf`: creates the user `clone_username` as an administrator, sets its
+2. Setup finishes; `SetupComplete.cmd` starts the service, which runs with `cloudbase-init.conf`: creates the user `clone_username` as an administrator, sets its
    **password** from the drive, writes its **SSH keys**, disables the built-in `Administrator`
 3. `ssh <clone_username>@<address>` works, by key and by password, into PowerShell
 
@@ -257,6 +265,7 @@ A clone's first boot (**to prove** with the first clone):
 | `SYSPRP WinMain: Unable to parse command-line arguments` | the answer file's path with spaces after `/unattend:`; fixed: sysprep runs from the file's folder with its bare name |
 | "Error converting VM to template, could not stop" | Windows did not shut down in the time Proxmox waits. Shut the VM down by hand; the alternative is sysprep with `/shutdown`, started detached |
 | The post-processor fails | `curl` missing, or the token may not change the VM's options. The template exists; set it by hand: `qm set <id> --localtime 0` |
+| A clone has its user and password, but SSH by key is refused; cloudbase-init's log has `Cannot load user profile: 'The device is not ready.'` and, on every boot, `SetUserSSHPublicKeysPlugin` failing with `[WinError 2]` | the service ran during Windows setup: a template built before the `SetupComplete.cmd` fix (step 7). Rebuild the template. In such a clone by hand: delete the value `CreateUserPlugin` under `HKLM\SOFTWARE\Cloudbase Solutions\Cloudbase-Init\<id>\Plugins` and `Start-Service cloudbase-init` |
 | A build that died half-way | the VM with the build's id is still there and is not a template. Remove it before the next build |
 
 ## The tests

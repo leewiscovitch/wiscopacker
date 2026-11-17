@@ -61,11 +61,32 @@ try {
     Remove-Item -Path $msi -Force
   }
 
-  # 2. The service must exist, start with Windows, and not run now: its first run belongs to a clone.
+  # 2. The service must exist and not run now: its first run belongs to a clone. In the template it does not
+  #    start with Windows: started by Windows, it would run while a clone is still in Windows setup, where a
+  #    user's profile cannot be loaded yet ("The device is not ready"), so the user gets no profile and no SSH
+  #    keys, and the service may restart Windows in the middle of setup (seen in the first clone). Windows runs
+  #    SetupComplete.cmd once, as SYSTEM, when setup has finished and before the logon screen: that file makes
+  #    the service start with Windows from then on and starts it.
   $service = Get-Service -Name "cloudbase-init" -ErrorAction SilentlyContinue
   if (-not $service) { throw "the service cloudbase-init does not exist after the install" }
   if ($service.Status -ne "Stopped") { Stop-Service -Name "cloudbase-init" -Force }
-  Set-Service -Name "cloudbase-init" -StartupType Automatic
+  Set-Service -Name "cloudbase-init" -StartupType Manual
+
+  $setup_scripts = "C:\Windows\Setup\Scripts"
+  $setup_complete = "$setup_scripts\SetupComplete.cmd"
+  if ((Test-Path $setup_complete) -and -not (Select-String -Path $setup_complete -Pattern "cloudbase-init" -Quiet)) {
+    throw "$setup_complete already exists and was not written by this build: not overwritten"
+  }
+  New-Item -ItemType Directory -Path $setup_scripts -Force | Out-Null
+  Set-Content -Path $setup_complete -Encoding ascii -Value @'
+@echo off
+rem Written by the template build (install-cloudbase-init.ps1). Windows runs this once, as SYSTEM, when setup
+rem has finished: from now on cloudbase-init starts with Windows, and its first run starts now.
+sc.exe config cloudbase-init start= auto
+sc.exe start cloudbase-init
+exit /b 0
+'@
+  Write-Output "install-cloudbase-init: service set to Manual; $setup_complete starts it once setup has finished"
 
   # 3. Both configuration files, rendered by Packer onto the build CD (found by its label).
   $letter = (Get-Volume -FileSystemLabel $env:BUILD_CD_LABEL -ErrorAction SilentlyContinue | Select-Object -First 1).DriveLetter
