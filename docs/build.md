@@ -218,14 +218,15 @@ end). On Server it is nearly always a pending restart or an update still install
 Packer shuts the VM down, makes it a template, removes the three CDs, adds the empty cloud-init drive, and the
 last step sets `localtime=0`.
 
-A clone's first boot (**to prove** with the first clone):
+A clone's first boot (proved 2026-11-17, the second clone; the first showed the race fixed in step 7):
 
 1. Windows finishes setup with cloudbase-init's `Unattend.xml`. In its specialize pass cloudbase-init runs once
-   with `cloudbase-init-unattend.conf`: it sets the **host name** from the cloud-init drive and grows `C:`.
-   Windows restarts
+   with `cloudbase-init-unattend.conf`: it sets the **host name** from the cloud-init drive and grows `C:` (a
+   clone with a disk 16 GB bigger: "Extending volume ... with 17179..." bytes). Windows restarts
 2. Setup finishes; `SetupComplete.cmd` starts the service, which runs with `cloudbase-init.conf`: creates the user `clone_username` as an administrator, sets its
    **password** from the drive, writes its **SSH keys**, disables the built-in `Administrator`
-3. `ssh <clone_username>@<address>` works, by key and by password, into PowerShell
+3. `ssh <clone_username>@<address>` works, by key and by password, into PowerShell: about two minutes from the
+   clone's start, with no console input. The service's run needs no restart of its own (the name is already set)
 
 ## cloudbase-init: the two config files
 
@@ -247,9 +248,8 @@ A clone's first boot (**to prove** with the first clone):
   clone's password in plain text. (The drive itself stays attached to the clone and holds it too: that is how
   Proxmox does cloud-init)
 - `UserDataPlugin` is in the first run so that the name is set before the first full boot, and in the normal run
-  in case that did not happen. **To prove:** that the name really is set during setup. If the first clone comes
-  up with a random `WIN-...` name and renames itself one restart later, take `UserDataPlugin` out of
-  `cloudbase-init-unattend.conf.pkrtpl`; everything else still works
+  in case that did not happen. Proved: in a clone the first run sets the name during setup, and the service's run
+  finds it set and restarts nothing
 
 ## What to check after a build
 
