@@ -6,10 +6,16 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
 function Invoke-QuietDelete {
-  # Deletes what it can. A file that is in use (this script itself, a log being written) stays.
+  # Deletes what it can. A file that is in use (this script itself, a log being written) stays. A folder
+  # that vanishes while it is being deleted (Windows clearing the same cache at the same time: seen on Server
+  # Core) makes Remove-Item throw a terminating error, which -ErrorAction does not silence: caught here.
   param([string[]]$Path)
   foreach ($item in $Path) {
-    Remove-Item -Path $item -Recurse -Force -ErrorAction SilentlyContinue
+    try {
+      Remove-Item -Path $item -Recurse -Force -ErrorAction SilentlyContinue
+    } catch {
+      Write-Output "cleanup: left alone, $item ($($_.Exception.Message))"
+    }
   }
 }
 
