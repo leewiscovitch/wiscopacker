@@ -52,6 +52,7 @@
       <!--
         GPT for UEFI: EFI system partition, Microsoft reserved, then Windows to the end of the disk. No
         recovery partition: it would sit behind C: and stop a clone with a bigger disk from growing it.
+        (Setup makes one anyway, by shrinking C:; cleanup.ps1 removes it and puts WinRE on C:.)
       -->
       <DiskConfiguration>
         <Disk wcm:action="add">

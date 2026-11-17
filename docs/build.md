@@ -103,7 +103,9 @@ Setup looks for a file of that name in the root of every drive and finds it on t
   `2k25`, listed for the letters `D:`, `E:` and `F:` because the CDs' letters are not fixed; a GPT disk (EFI
   260 MB, MSR 16 MB, Windows to the end); the edition by its **name** in `install.wim`; no product key
 - **No recovery partition.** Setup would put it behind `C:`, and a clone with a bigger disk could then not grow
-  `C:` into the new space
+  `C:` into the new space. **Setup makes one anyway:** WinRE's agent shrinks `C:` by about 0.9 GB and puts WinRE
+  in a new partition at the end (setup's log: `ShrinkOsPartition`; the first clone had `C:` stuck at 62.9 GB on an
+  80 GB disk). `cleanup.ps1` removes it (step 8)
 - **specialize**: the time zone; no computer name, so Windows picks a random one (a clone gets its own in step 9)
 - **oobeSystem**: every welcome page skipped; the built-in `Administrator` gets the build password; one automatic
   logon; two commands at that logon (step 4)
@@ -178,8 +180,18 @@ After the last restart, so that its service never starts in the build VM.
 ### 8. `cleanup.ps1`, then `sysprep.ps1`
 
 `cleanup.ps1` waits until nothing is installing, **stops the build if Windows still wants a restart** (sysprep
-would refuse, or the half-finished installation would be in every clone), then removes crash dumps, the update
-download cache, temp folders, setup's copies of the answer file, and clears the event logs.
+would refuse, or the half-finished installation would be in every clone), then:
+
+- **the recovery partition behind `C:`** (step 3): WinRE moved back into `C:` (`reagentc /disable`), the
+  partition removed, `C:` grown to the end of the disk, WinRE on again (`reagentc /enable`: with no recovery
+  partition it stays on `C:`). Any other partition behind `C:` stops the build untouched
+- crash dumps, the update download cache, temp folders
+- **setup's copies of the answer file**, `C:\Windows\Panther\unattend-original.xml` among them: setup leaves
+  the build password in it **in plain text** (the others it blanks). Then every XML file under
+  `C:\Windows\Panther` and `C:\Windows\System32\Sysprep` is read, and the build stops if one still holds a
+  password value. (Found in the first clone: the account is disabled and the password random per build, but no
+  secret belongs in the image)
+- the event logs, last
 
 `sysprep.ps1`:
 
@@ -266,6 +278,8 @@ A clone's first boot (**to prove** with the first clone):
 | "Error converting VM to template, could not stop" | Windows did not shut down in the time Proxmox waits. Shut the VM down by hand; the alternative is sysprep with `/shutdown`, started detached |
 | The post-processor fails | `curl` missing, or the token may not change the VM's options. The template exists; set it by hand: `qm set <id> --localtime 0` |
 | A clone has its user and password, but SSH by key is refused; cloudbase-init's log has `Cannot load user profile: 'The device is not ready.'` and, on every boot, `SetUserSSHPublicKeysPlugin` failing with `[WinError 2]` | the service ran during Windows setup: a template built before the `SetupComplete.cmd` fix (step 7). Rebuild the template. In such a clone by hand: delete the value `CreateUserPlugin` under `HKLM\SOFTWARE\Cloudbase Solutions\Cloudbase-Init\<id>\Plugins` and `Start-Service cloudbase-init` |
+| A clone's `C:` is about 0.9 GB short of the disk and does not grow (`Get-Partition`: a `Recovery` partition behind it) | a template built before the fix in `cleanup.ps1` (step 8): Setup made a WinRE partition. Rebuild |
+| `cleanup: FAILED: ... still holds a password` | an answer file copy setup left that the list in `cleanup.ps1` does not know yet: add it there |
 | A build that died half-way | the VM with the build's id is still there and is not a template. Remove it before the next build |
 
 ## The tests

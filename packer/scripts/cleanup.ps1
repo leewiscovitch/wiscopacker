@@ -47,17 +47,45 @@ try {
   }
   Write-Output "cleanup: no restart pending"
 
-  # 3. Crash dumps
+  # 3. No recovery partition behind C:. Windows Setup makes one even when the answer file has none: WinRE's
+  #    agent shrinks C: and puts WinRE in a new partition at the end of the disk (seen in the first clone,
+  #    setup's log: ShrinkOsPartition). A clone with a bigger disk could then never grow C:. WinRE is moved back
+  #    into C: (reagentc /disable copies it to C:\Windows\System32\Recovery), the partition removed, C: grown
+  #    to the end, WinRE switched on again: with no recovery partition it stays on C:.
+  $os = Get-Partition -DriveLetter C
+  $behind = @(Get-Partition -DiskNumber $os.DiskNumber | Where-Object { $_.Offset -gt $os.Offset })
+  $recovery_type = "{de94bba4-06d1-4d40-a16a-bfd50179d6ac}"
+  $other = @($behind | Where-Object { $_.GptType -ne $recovery_type })
+  if ($other.Count -gt 0) {
+    throw "a partition that is not a recovery partition sits behind C: (number $($other[0].PartitionNumber)): not touched"
+  }
+  if ($behind.Count -gt 0) {
+    & reagentc.exe /disable | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "reagentc /disable ended with exit code $LASTEXITCODE" }
+    foreach ($partition in $behind) {
+      Remove-Partition -DiskNumber $os.DiskNumber -PartitionNumber $partition.PartitionNumber -Confirm:$false
+    }
+    $max = (Get-PartitionSupportedSize -DriveLetter C).SizeMax
+    if ($max -gt (Get-Partition -DriveLetter C).Size) { Resize-Partition -DriveLetter C -Size $max }
+    & reagentc.exe /enable | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "reagentc /enable ended with exit code $LASTEXITCODE" }
+    Write-Output "cleanup: recovery partition behind C: removed, C: grown to the end, WinRE now on C:"
+  }
+  else {
+    Write-Output "cleanup: nothing behind C:"
+  }
+
+  # 4. Crash dumps
   Invoke-QuietDelete -Path "C:\Windows\MEMORY.DMP", "C:\Windows\Minidump\*", "C:\Windows\LiveKernelReports\*.dmp", "C:\ProgramData\Microsoft\Windows\WER\ReportQueue\*", "C:\ProgramData\Microsoft\Windows\WER\ReportArchive\*"
   Get-ChildItem -Path "C:\Users" -Filter "*.dmp" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
   Write-Output "cleanup: crash dumps removed"
 
-  # 4. The update download cache (the updates are installed; the downloads are only space)
+  # 5. The update download cache (the updates are installed; the downloads are only space)
   Stop-Service -Name "wuauserv", "bits" -Force -ErrorAction SilentlyContinue
   Invoke-QuietDelete -Path "C:\Windows\SoftwareDistribution\Download\*"
   Write-Output "cleanup: update download cache removed"
 
-  # 5. Temp folders, with the logs the build's own scripts wrote. Packer's own files (this script, its
+  # 6. Temp folders, with the logs the build's own scripts wrote. Packer's own files (this script, its
   #    environment file) stay: Packer removes them itself after each script and fails if they are gone.
   #    sysprep.ps1 removes what is left at the very end.
   Get-ChildItem -Path "C:\Windows\Temp" -Force -ErrorAction SilentlyContinue |
@@ -66,15 +94,24 @@ try {
   Invoke-QuietDelete -Path "C:\Users\*\AppData\Local\Temp\*"
   Write-Output "cleanup: temp folders emptied"
 
-  # 6. Windows' own copies of the answer file. Setup has already blanked the password in them; they are
+  # 7. Windows' own copies of the answer file. Setup has already blanked the password in them; they are
   #    removed anyway.
-  Invoke-QuietDelete -Path "C:\Windows\Panther\unattend.xml", "C:\Windows\Panther\Unattend\*", "C:\Windows\System32\Sysprep\unattend.xml"
-  Write-Output "cleanup: setup's answer file copies removed"
+  #    unattend-original.xml is not blanked: it holds the build password in plain text (seen in the first
+  #    clone). Then no answer file left under setup's folders may hold a password value.
+  Invoke-QuietDelete -Path "C:\Windows\Panther\unattend.xml", "C:\Windows\Panther\unattend-original.xml", "C:\Windows\Panther\Unattend\*", "C:\Windows\System32\Sysprep\unattend.xml"
+  $ns = @{ u = "urn:schemas-microsoft-com:unattend" }
+  $files = @(Get-ChildItem -Path "C:\Windows\Panther", "C:\Windows\System32\Sysprep" -Filter "*.xml" -Recurse -File -ErrorAction SilentlyContinue)
+  foreach ($file in $files) {
+    $values = @(Select-Xml -Path $file.FullName -Namespace $ns -XPath "//u:Password/u:Value | //u:AdministratorPassword/u:Value" -ErrorAction SilentlyContinue |
+      Where-Object { $_.Node.InnerText -and $_.Node.InnerText -notlike "*SENSITIVE*DATA*DELETED*" })
+    if ($values.Count -gt 0) { throw "$($file.FullName) still holds a password" }
+  }
+  Write-Output "cleanup: setup's answer file copies removed; none of $($files.Count) XML files left holds a password"
 
-  # 7. PowerShell's command history of the build account
+  # 8. PowerShell's command history of the build account
   Invoke-QuietDelete -Path "C:\Users\*\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
 
-  # 8. Event logs, last: a clone's logs start with the clone. Some logs cannot be cleared; that is fine.
+  # 9. Event logs, last: a clone's logs start with the clone. Some logs cannot be cleared; that is fine.
   $cleared = 0
   foreach ($log in (& wevtutil.exe el)) {
     & cmd.exe /c "wevtutil.exe cl `"$log`" > nul 2>&1"
