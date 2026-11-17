@@ -50,7 +50,8 @@ What differs on Core: no Explorer, so the VM's console shows a command window (o
 scripts are the same. One fault Core showed and the desktop never did: `cleanup.ps1`'s delete of the update
 download cache met a folder Windows removed at the same moment and failed the build; the delete now leaves such a
 folder alone (step 8). And a clone of the first Core template could not be reached by SSH: Windows Update had
-put sshd's firewall rule back to the private profile only (step 8, `sysprep.ps1` now sets it again). A Core
+put sshd's firewall rule back to the private profile only (step 8, `sysprep.ps1` now sets it again; a rebuilt
+template's fresh clone answered SSH with no hand fix). A Core
 clone shows one device in error, the ICH9 HD Audio controller every q35 VM has: Core has no audio driver.
 Harmless.
 

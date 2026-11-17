@@ -8,8 +8,8 @@ For anyone running Proxmox VE who wants Windows guests made like cloud instances
 nothing here is tied to one lab.
 
 **Status:** Windows Server 2025, with the desktop and as Server Core, built with Windows Update and cloned on
-Proxmox VE 9.2 (2026-11); the clone is managed over SSH with no console input. The last fix (`sysprep.ps1`, the
-firewall rule) still waits for its build. Windows 11 follows.
+Proxmox VE 9.2 (2026-11); the clone is managed over SSH with no console input, the Core clone included (the
+`sysprep.ps1` firewall fix is proved by a build and a fresh clone). Windows 11 follows.
 
 ## The AWS loop, mapped
 
