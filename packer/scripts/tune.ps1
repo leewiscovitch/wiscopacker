@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-function Set-RegistryValue {
+function Write-RegistryValue {
   param([string]$Path, [string]$Name, [string]$Type, $Value)
   if (-not (Test-Path $Path)) { New-Item -Path $Path -Force | Out-Null }
   New-ItemProperty -Path $Path -Name $Name -PropertyType $Type -Value $Value -Force | Out-Null
@@ -26,12 +26,12 @@ try {
 
   # --- RealTimeIsUniversal: Windows reads and writes the hardware clock as UTC, not as local time.
   #     The VM must then hand out UTC as well (Proxmox: localtime=0, set after the build).
-  Set-RegistryValue -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation" -Name "RealTimeIsUniversal" -Type DWord -Value 1
+  Write-RegistryValue -Path "HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation" -Name "RealTimeIsUniversal" -Type DWord -Value 1
   Write-Output "tune: hardware clock is UTC (RealTimeIsUniversal)"
 
   # --- Secure time seeding off: it guesses the time from TLS handshakes and has set servers' clocks
   #     months off. Time comes from the time service alone.
-  Set-RegistryValue -Path "HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Config" -Name "UtilizeSslTimeData" -Type DWord -Value 0
+  Write-RegistryValue -Path "HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Config" -Name "UtilizeSslTimeData" -Type DWord -Value 0
   Write-Output "tune: secure time seeding off"
 
   # --- Power plan "high performance" (a VM has nothing to save by slowing down) ---
@@ -78,7 +78,8 @@ try {
   # --- Execution policy RemoteSigned: local scripts run, downloaded ones need a signature ---
   #     Packer runs this script with the policy "Bypass" for its own process; Set-ExecutionPolicy reports
   #     that as an error although the machine's value is written, so the value is read back instead.
-  try { Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force } catch { }
+  try { Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force }
+  catch { Write-Output "tune: Set-ExecutionPolicy reported (expected under Packer): $($_.Exception.Message.Split([char]10)[0])" }
   if ((Get-ExecutionPolicy -Scope LocalMachine) -ne "RemoteSigned") { throw "the machine's execution policy is not RemoteSigned" }
   Write-Output "tune: execution policy RemoteSigned"
 

@@ -53,8 +53,8 @@ step "PSScriptAnalyzer"
 if command -v pwsh > /dev/null; then
   pwsh -NoProfile -Command '
     if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) { Write-Output "skipped (module PSScriptAnalyzer not installed)"; exit 0 }
-    $found = Invoke-ScriptAnalyzer -Path packer/scripts -Recurse -Severity Warning, Error
-    $found | Format-Table -AutoSize
+    $found = Invoke-ScriptAnalyzer -Path packer/scripts -Recurse -Settings tests/PSScriptAnalyzerSettings.psd1
+    $found | Format-Table -AutoSize -Property ScriptName, Line, Severity, RuleName, Message | Out-String -Width 220
     if ($found) { exit 1 }
     Write-Output "clean"
   ' || bad "PSScriptAnalyzer"

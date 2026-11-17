@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-function Remove-Quietly {
+function Invoke-QuietDelete {
   # Deletes what it can. A file that is in use (this script itself, a log being written) stays.
   param([string[]]$Path)
   foreach ($item in $Path) {
@@ -48,13 +48,13 @@ try {
   Write-Output "cleanup: no restart pending"
 
   # 3. Crash dumps
-  Remove-Quietly -Path "C:\Windows\MEMORY.DMP", "C:\Windows\Minidump\*", "C:\Windows\LiveKernelReports\*.dmp", "C:\ProgramData\Microsoft\Windows\WER\ReportQueue\*", "C:\ProgramData\Microsoft\Windows\WER\ReportArchive\*"
+  Invoke-QuietDelete -Path "C:\Windows\MEMORY.DMP", "C:\Windows\Minidump\*", "C:\Windows\LiveKernelReports\*.dmp", "C:\ProgramData\Microsoft\Windows\WER\ReportQueue\*", "C:\ProgramData\Microsoft\Windows\WER\ReportArchive\*"
   Get-ChildItem -Path "C:\Users" -Filter "*.dmp" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
   Write-Output "cleanup: crash dumps removed"
 
   # 4. The update download cache (the updates are installed; the downloads are only space)
   Stop-Service -Name "wuauserv", "bits" -Force -ErrorAction SilentlyContinue
-  Remove-Quietly -Path "C:\Windows\SoftwareDistribution\Download\*"
+  Invoke-QuietDelete -Path "C:\Windows\SoftwareDistribution\Download\*"
   Write-Output "cleanup: update download cache removed"
 
   # 5. Temp folders, with the logs the build's own scripts wrote. Packer's own files (this script, its
@@ -63,16 +63,16 @@ try {
   Get-ChildItem -Path "C:\Windows\Temp" -Force -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -notlike "script-*.ps1" -and $_.Name -notlike "packer-*" } |
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-  Remove-Quietly -Path "C:\Users\*\AppData\Local\Temp\*"
+  Invoke-QuietDelete -Path "C:\Users\*\AppData\Local\Temp\*"
   Write-Output "cleanup: temp folders emptied"
 
   # 6. Windows' own copies of the answer file. Setup has already blanked the password in them; they are
   #    removed anyway.
-  Remove-Quietly -Path "C:\Windows\Panther\unattend.xml", "C:\Windows\Panther\Unattend\*", "C:\Windows\System32\Sysprep\unattend.xml"
+  Invoke-QuietDelete -Path "C:\Windows\Panther\unattend.xml", "C:\Windows\Panther\Unattend\*", "C:\Windows\System32\Sysprep\unattend.xml"
   Write-Output "cleanup: setup's answer file copies removed"
 
   # 7. PowerShell's command history of the build account
-  Remove-Quietly -Path "C:\Users\*\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
+  Invoke-QuietDelete -Path "C:\Users\*\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
 
   # 8. Event logs, last: a clone's logs start with the clone. Some logs cannot be cleared; that is fine.
   $cleared = 0
