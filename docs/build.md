@@ -1,8 +1,9 @@
 # The build, step by step
 
 What `packer build` does to make a Windows Server 2025 template, why each step is there, what to check, and what
-goes wrong. Status: the files pass `tests/run`; **no build has run yet**. What the first builds must prove is
-marked "to prove".
+goes wrong. Status: a build without Windows Update runs through untouched (2026-11-17, about 17 minutes, three
+tries: the two sysprep fixes below); the build with updates and the first clone are still to come. What those
+must prove is marked "to prove".
 
 ## What you need
 
@@ -252,6 +253,8 @@ A clone's first boot (**to prove** with the first clone):
 | "Waiting for SSH" for ever | step 4 |
 | `cleanup: FAILED: Windows still wants a restart` | an update needs two restarts; run the build again, or add a second restart before the cleanup |
 | `sysprep: FAILED` | step 8; the log shows sysprep's own error |
+| `sysprep: this Windows is already generalized` on a first build | an old check (`GeneralizationState` is 7 on a fresh install too); fixed: the script reads `ImageState` |
+| `SYSPRP WinMain: Unable to parse command-line arguments` | the answer file's path with spaces after `/unattend:`; fixed: sysprep runs from the file's folder with its bare name |
 | "Error converting VM to template, could not stop" | Windows did not shut down in the time Proxmox waits. Shut the VM down by hand; the alternative is sysprep with `/shutdown`, started detached |
 | The post-processor fails | `curl` missing, or the token may not change the VM's options. The template exists; set it by hand: `qm set <id> --localtime 0` |
 | A build that died half-way | the VM with the build's id is still there and is not a template. Remove it before the next build |
