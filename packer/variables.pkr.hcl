@@ -132,6 +132,12 @@ variable "clone_username" {
 
 # --- The VM ---
 
+variable "cpu_type" {
+  type        = string
+  default     = "x86-64-v2-AES"
+  description = "CPU type of the template (a clone can change it). The default is Proxmox's own for new VMs: runs on nearly any x86-64 node, Intel or AMD, and live-migrates between unlike ones. \"host\" gives every feature of the node's CPU (nested virtualization too), but live migration then needs the same CPU on every node."
+}
+
 variable "cores" {
   type        = number
   default     = 2

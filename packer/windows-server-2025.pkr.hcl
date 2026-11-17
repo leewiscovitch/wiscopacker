@@ -53,7 +53,7 @@ source "proxmox-iso" "server-2025" {
   os              = "win11"
   machine         = "q35"
   bios            = "ovmf"
-  cpu_type        = "host"
+  cpu_type        = var.cpu_type
   sockets         = 1
   cores           = var.cores
   memory          = var.memory

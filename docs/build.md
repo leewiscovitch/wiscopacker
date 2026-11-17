@@ -63,7 +63,7 @@ your var file), read that version's docs for the arguments used here, run a buil
 | TPM 2.0 | the same; the state is a small disk beside the others and is cloned with them |
 | VirtIO SCSI single, one disk with `io_thread`, `discard`, `ssd` | the fast path; `discard` gives freed space back to the storage |
 | VirtIO network card | the same |
-| CPU `host` | every CPU feature of the node. A template then runs only on nodes with the same kind of CPU |
+| CPU `x86-64-v2-AES` (variable `cpu_type`) | Proxmox's default for new VMs: SSE4.2, POPCNT, AES, enough for Server 2025; runs and live-migrates on nearly any x86-64 node, Intel or AMD. `host` gives every feature of the node's CPU (AVX2, nested virtualization), but a running VM then migrates only between nodes with the same CPU. The image itself is generalized: a clone boots on any CPU, the type is only in the VM's config |
 | guest agent on | Packer asks the agent for the VM's address; Proxmox uses it for a clean shutdown |
 | a cloud-init drive | added by Packer when the VM becomes a template; empty until a clone's settings fill it |
 
